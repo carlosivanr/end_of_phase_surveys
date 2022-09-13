@@ -5,15 +5,15 @@
 # From Wendy Christensen:
 # The data sets contain data from each end-of-phase (EOP) survey, which is a 
 # required survey for all medical students at the end of every academic year. 
-# Some of years do not include clerkships and clinical work started changing in 
+# Some years do not include clerkships and clinical work started changing in 
 # 2020 with the "Hybrid" graduating class of 2024. 
 # Prior to 2020, the "clerkship year" was Phase 3 (EOP3), which is why the EOP3 
 # survey has an additional file with clerkship grades.
 
 # The CO in each data file indicates "Class Of". 
-# Students who completed the EOP1 survey started med school in 
-# AY 20-21 and, if they stay on-cycle, will graduate in 2024. 
-# Students can and do go off-cycle, but most students end up graduating on-time.
+# Students who completed the EOP1 survey started med school in AY 20-21 and, 
+# if they stay on-cycle, will graduate in 2024. Students can and do go 
+# # off-cycle, but most students end up graduating on-time.
 
 # CO = Class Of
 # AY = Academic Year
@@ -26,8 +26,8 @@
 # EOP4 is at the end of Year4, expected graduation in 2021
 
 # Survey Questions ProfID 1:9 tap into professional identification via a likert
-# scale with a range from 1:5 Strongly disagree, disagree, neutral, agree, 
-# strongly agree
+# style responses with a range from 1:5 Strongly disagree, disagree, neutral, 
+# agree, strongly agree
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 pacman::p_load(tidyverse,
@@ -61,16 +61,16 @@ source("./functions/process_eop.R")
 # eop2 maps from eop_files[[CO2023_EOP2]] and eop_code_books[["CO 2023 EOP 2"]]
 # eop1 maps from eop_files[[CO2024_EOP1]] and eop_code_books[["CO 2024 EOP 1"]]
 
-# EOP 4 WORKS!
+# EOP 4
 eop4 <- process_eop(eop_files[["CO2021_EOP4"]], eop_code_books[["CO 2021 EOP 4"]])
 
-# EOP 3 WORKS!
+# EOP 3
 eop3 <- process_eop(eop_files[["CO2022_EOP3"]], eop_code_books[["CO 2022 EOP 3"]])
 
-# EOP 2 WORKS!
+# EOP 2
 eop2 <- process_eop(eop_files[["CO2023_EOP2"]], eop_code_books[["CO 2023 EOP 2"]])
 
-# EOP 1 WORKS!
+# EOP 1
 eop1 <- process_eop(eop_files[["CO2024_EOP1"]], eop_code_books[["CO 2024 EOP 1"]])
 
 # EOP 3 Grades
@@ -83,21 +83,21 @@ eop3_grades %<>%
   filter(TERM_SD != "2021 Fall")
 
 # Only one student took a W, filtering that out to obtain a consistent grade for
-# each student rather than trying to take the most frequent, or the average of
-# multiple LIC grades. This student also 
+# each student. Equates to taking the most frequent grade which was decided on
+# by the research group. 
 eop3_grades %<>%
   filter(CRSE_GRADE_OFF != "W")
 
-# Get the most recent clerkship grade, simple and effective
+# Get the most recent clerkship grade. When W filtered out, equatest to taking
+# the most frequent, as every other student has the same grade for each semester.
 eop3_grades %<>%
   group_by(ResearchID) %>%
   arrange(TERM_SD) %>%
   slice_tail() %>%
   ungroup()
   
-
-# Process all ProfId columns, by converting to numeric and recoding those with
-# reversed scoring
+# Process all ProfId columns, by converting to numeric and reverse scoring 
+# questions 3, 4, and 5.
 source(here("functions", "process_ProfId.R"))
 
 # Set vector of data frames that have columns to convert dates

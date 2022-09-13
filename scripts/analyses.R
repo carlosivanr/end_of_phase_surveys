@@ -1,6 +1,3 @@
-
-
-
 library(rstatix)
 
 # Correlation between overall clerkship evaluations and clerkship grades

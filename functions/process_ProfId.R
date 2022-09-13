@@ -1,6 +1,17 @@
 # Process Professional ID questions ############################################
-# Input is a data frame
-# Output is a data frame
+# Carlos Rodriguez, PhD. CU Anschutz Medical Campus. Dept. of Family Medicine
+# Process Professional ID questions
+
+# Questions 3, 4, and 5 in the professional identification instrument of the 
+# end of phase survey need to be reverse-scored because higher scores indicate 
+# lower levels of professional identification. In the remaining questions, 
+# higher scores indicate higher levels of professional identification. Reverse-
+# scoreing questions 3, 4, and 5, will ensure that all questions scores can be
+# interpreted in a consistent manner.
+# 
+# Input is a data frame containing ProfId questions
+# Output is a data frame containing ProfId questions with the scores in 
+# questions 3, 4, and 5 reveresed. 
 # ##############################################################################
 
 proc_ProfId <- function(df_name){
