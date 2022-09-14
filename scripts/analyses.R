@@ -1,6 +1,7 @@
 library(rstatix)
 
-# Correlation between overall clerkship evaluations and clerkship grades
+# Correlation between overall clerkship evaluations and clerkship grades, first
+# filter out those that scored a 9, because that equates to an NA
 eop3_grades %>%
   filter(EvalCC3_1 != 9) %>%
   cor_test(
@@ -9,7 +10,7 @@ eop3_grades %>%
     method = "kendall"
     )
 
-# Means
+# Means by LIC
 eop3_grades %>%
   filter(EvalCC3_1 != 9) %>%
   group_by(LIC) %>%

@@ -25,7 +25,7 @@
 # EOP3 is at the end of Year3, expected graduation in 2022
 # EOP4 is at the end of Year4, expected graduation in 2021
 
-# Survey Questions ProfID 1:9 tap into professional identification via a likert
+# Survey Questions ProfID 1:9 tap into professional identification via a Likert
 # style responses with a range from 1:5 Strongly disagree, disagree, neutral, 
 # agree, strongly agree
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -39,6 +39,7 @@ pacman::p_load(tidyverse,
 # Load the data and the corresponding code book --------------------------------
 # List all the CO20 files in the data directory
 file_paths <- str_c("./data/", dir("./data", pattern = "CO20"))
+
 
 # Load the files into the list data
 eop_files <- map(file_paths, read.xlsx)
@@ -115,9 +116,16 @@ eop3_grades %<>%
            )
     )      
 
+# Additional processing
+eop3_grades$CRSE_LD <- factor(eop3_grades$CRSE_LD)
+eop3_grades$LIC <- factor(eop3_grades$LIC)
 
-
-
+# Compute a mean of ProfID
+eop3_grades %<>%
+  mutate(pmap_dfr(across(starts_with("ProfID")),
+                  ~ data.frame(ProfID = mean(c(...)))))
+# Save workspace ---------------------------------------------------------------
+save.image(file = "./data/eop_data.Rdata")
 
 
 
