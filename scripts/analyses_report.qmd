@@ -1,6 +1,8 @@
 ---
 title: "DFM - End of Phase Surveys"
-format: html
+format: 
+  html:
+    toc: true
 # format:
 #   docx:
 #     toc: true
@@ -42,17 +44,45 @@ eop3_grades %>%
 
 # Data Summary
 ```{r display_summary}
-
 eop3_grades %>%
   select(EvalCC3_1, CRSE_GRADE_OFF, CRSE_LD, LIC) %>%
   summary(.) %>%
   knitr::kable(.)
 ```
 
-
-```{r participant_demographics}
-
+# Demographics
+## Gender
+```{r}
+eop3_grades %>%
+  select(Gender) %>%
+  tbl_summary()
 ```
+
+
+## Race/Ethnicity
+```{r}
+eop3_grades %>%
+  select("Race/Ethnicity") %>%
+  tbl_summary() %>%
+```
+
+## URM
+```{r}
+eop3_grades %>%
+  select(URM, URM_AAMC) %>%
+  tbl_summary()
+```
+
+## Rural
+```{r}
+eop3_grades %>%
+  select(Rural) %>%
+  tbl_summary()
+```
+
+
+
+
 
 # Research Question 1: 
 
@@ -105,32 +135,58 @@ test_stat <-
 
 Family medicine and primary care clerkship grades were not significantly related to a mean of professional identity scores, r<sub>$\tau$</sub> = `r test_stat[["tau"]]`, p (two-tailed) > 0.05.
 
-Possible that the relationship between clerkship grades and professional identity is different between those in the LIC vs those who were not.
+# Research Question 3:
 ```{r}
-eop3_grades %>%
-  filter(EvalCC3_1 != 9) %>%
-  group_by(LIC) %>%
-  cor_test(
-    CRSE_GRADE_OFF, 
-    ProfID, 
-    method = "kendall"
-    ) %>%
-  knitr::kable(.)
+library(MASS)
+polr_data <- eop3_grades %>%
+  mutate(ProfID = factor(round(ProfID, 0)))
+         
+m <- polr(ProfID ~ Gender, data = polr_data)
 
-test_stat <- 
-  eop3_grades %>%
-  filter(EvalCC3_1 != 9) %>%
-  group_by(LIC) %>%
-  cor_test( 
-    CRSE_GRADE_OFF,
-    ProfID,
-    method = "kendall"
-    ) %>%
-  pull(cor) 
+summary(m)
+
+library(brant)
+brant(m)
+
+# Store table of coefficients
+ctable = coef(summary(m))
+
+# Calculate and store p values
+p = pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+
+# Combined table
+(ctable = cbind(ctable, "p value" = p))
+
+# default method gives profiled CIs
+(ci = confint(m))
 ```
 
-Family medicine and primary care clerkship grades were not significantly related to a mean of professional identity scores in students not enrolled in an LIC clerkship, r<sub>$\tau$</sub> = `r test_stat[1][[1]]`, p (two-tailed) > 0.05. 
+<!-- Possible that the relationship between clerkship grades and professional identity is different between those in the LIC vs those who were not. -->
+<!-- ```{r} -->
+<!-- eop3_grades %>% -->
+<!--   filter(EvalCC3_1 != 9) %>% -->
+<!--   group_by(LIC) %>% -->
+<!--   cor_test( -->
+<!--     CRSE_GRADE_OFF,  -->
+<!--     ProfID,  -->
+<!--     method = "kendall" -->
+<!--     ) %>% -->
+<!--   knitr::kable(.) -->
 
-Similarly, among students who were enrolled in an LIC clerkship, family medicine and primary care clerkship grades were not significantly related to a mean of professional identity scores, r<sub>$\tau$</sub> = `r test_stat[1][[1]]`, p (two-tailed) > 0.05. 
+<!-- test_stat <-  -->
+<!--   eop3_grades %>% -->
+<!--   filter(EvalCC3_1 != 9) %>% -->
+<!--   group_by(LIC) %>% -->
+<!--   cor_test(  -->
+<!--     CRSE_GRADE_OFF, -->
+<!--     ProfID, -->
+<!--     method = "kendall" -->
+<!--     ) %>% -->
+<!--   pull(cor)  -->
+<!-- ``` -->
 
-No evidence for a relationship between grades from the family medicine and primary care clerkship and measures of professional identity. Furthermore, the same holds true when disaggretating data by whether or not a student was enrolled in an LIC clerkship.
+<!-- Family medicine and primary care clerkship grades were not significantly related to a mean of professional identity scores in students not enrolled in an LIC clerkship, r<sub>$\tau$</sub> = `r test_stat[1][[1]]`, p (two-tailed) > 0.05.  -->
+
+<!-- Similarly, among students who were enrolled in an LIC clerkship, family medicine and primary care clerkship grades were not significantly related to a mean of professional identity scores, r<sub>$\tau$</sub> = `r test_stat[1][[1]]`, p (two-tailed) > 0.05.  -->
+
+<!-- No evidence for a relationship between grades from the family medicine and primary care clerkship and measures of professional identity. Furthermore, the same holds true when disaggretating data by whether or not a student was enrolled in an LIC clerkship. -->

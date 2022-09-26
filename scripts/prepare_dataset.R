@@ -74,7 +74,7 @@ eop2 <- process_eop(eop_files[["CO2023_EOP2"]], eop_code_books[["CO 2023 EOP 2"]
 # EOP 1
 eop1 <- process_eop(eop_files[["CO2024_EOP1"]], eop_code_books[["CO 2024 EOP 1"]])
 
-# EOP 3 Grades
+# EOP 3 Grades - process_eop delivers an error but it can be ignored
 eop3_grades <- process_eop(eop_files[["CO2022_EOP3_grades_schmerling.xlsx"]], 
                            eop_code_books[["CO 2022 EOP + Clerkship Grades"]])
 
@@ -116,9 +116,16 @@ eop3_grades %<>%
            )
     )      
 
-# Additional processing
+# Additional processing --------------------------------------------------------
 eop3_grades$CRSE_LD <- factor(eop3_grades$CRSE_LD)
 eop3_grades$LIC <- factor(eop3_grades$LIC)
+
+# Recode the Rural and URM variables
+eop3_grades %<>%
+  mutate(across(Rural:URM_AAMC, ~ recode(., `0` = "No", `1` = "Yes", `3` = "Unknown"))) %>%
+  mutate(Rural = ifelse(is.na(Rural), "Unknown", Rural)) %>%
+  mutate(across(Rural:URM_AAMC, ~ factor(., levels = c("Yes", "No", "Unknown"))))
+  
 
 # Compute a mean of ProfID
 eop3_grades %<>%
