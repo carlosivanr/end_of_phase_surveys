@@ -22,7 +22,8 @@ pacman::p_load(here,
                openxlsx,
                Hmisc,
                magrittr,
-               DT)
+               DT,
+               car)
 
 options(dplyr.summarise.inform = FALSE) 
 ```
@@ -42,50 +43,64 @@ eop3_grades %>%
   datatable(.)
 ```
 
-# Data Summary
-```{r display_summary}
-eop3_grades %>%
-  select(EvalCC3_1, CRSE_GRADE_OFF, CRSE_LD, LIC) %>%
-  summary(.) %>%
-  knitr::kable(.)
-```
-
 # Demographics
-## Gender
+## Matriculation age, gender, rural, and urm
 ```{r}
 eop3_grades %>%
-  select(Gender) %>%
+  select(Matriculation_Age, Gender, Rural, URM, URM_AAMC) %>%
   tbl_summary()
 ```
-
 
 ## Race/Ethnicity
 ```{r}
 eop3_grades %>%
   select("Race/Ethnicity") %>%
-  tbl_summary() %>%
+  tbl_summary(sort = list(everything() ~ "frequency"))
 ```
 
-## URM
+
+## Track, LIC, Course
 ```{r}
-eop3_grades %>%
-  select(URM, URM_AAMC) %>%
-  tbl_summary()
+eop3_grades %>% 
+  select(Track, LIC, CRSE_LD) %>%
+  tbl_summary(sort = list(everything() ~ "frequency"))
 ```
 
-## Rural
-```{r}
+# Data Summary
+```{r display_summary}
 eop3_grades %>%
-  select(Rural) %>%
-  tbl_summary()
+  select(EvalCC3_1, CRSE_GRADE_OFF, ProfID, ProfID_1:ProfID_9) %>%
+  summary(.) %>%
+  knitr::kable(.)
 ```
 
 
+```{r fig.cap="Poor (1), Fair (2), Good (3), Very Good (4), Excellent (5)"}
+boxplot(eop3_grades$EvalCC3_1,
+        main = "Primary Care Clerkship Evaluations",
+        ylab = "Clerkship Quality Evaluation")
+```
 
+```{r, fig.cap="Grades are Withdraw (1), Pass (2), High Pass (3), Honors(4)"}
+boxplot(eop3_grades$CRSE_GRADE_OFF,
+        main = "Clerkship Grades",
+        ylab = "Clerkship Grade")
+```
+
+```{r, fig.cap="Professional identification responses are Strongly disagree (1), Disagree (2), Neutral (3), Agree (4), Strongly agree (5)"}
+profid <- eop3_grades %>%
+  select(ProfID_1:ProfID) %>%
+  pivot_longer(.,
+               cols = c(ProfID_1:ProfID_9, ProfID),
+               names_to = "Question", 
+               values_to = "Score")
+
+boxplot(Score ~ Question, data = profid,
+        main = "Professional Identification Questionaire")    
+```
 
 
 # Research Question 1: 
-
 What is the relationship between clerkship evaluations and grades from the family medicine and primary care clerkship?
 ```{r}
 eop3_grades %>%
@@ -96,6 +111,8 @@ eop3_grades %>%
     method = "kendall"
     ) %>%
   knitr::kable(.)
+
+# Save the test statistic to a variable for reporting output
 test_stat <- 
   eop3_grades %>%
   filter(EvalCC3_1 != 9) %>%
@@ -110,7 +127,6 @@ test_stat <-
 There was a significant positive relationship between a student's clerkship evaluation and their grades from the family medicine and primary care clerkship, r<sub>$\tau$</sub> = `r test_stat[["tau"]]`, p (two-tailed) < 0.05.
 
 # Research Question 2: 
-
 What is the relationship between family medicine and primary care clerkship grades and professional identity in 3rd year medical students?
 ```{r}
 eop3_grades %>%
@@ -122,6 +138,7 @@ eop3_grades %>%
     ) %>%
   knitr::kable(.)
 
+# Save the test statistic to a variable for reporting output
 test_stat <- 
   eop3_grades %>%
   filter(EvalCC3_1 != 9) %>%
@@ -136,13 +153,129 @@ test_stat <-
 Family medicine and primary care clerkship grades were not significantly related to a mean of professional identity scores, r<sub>$\tau$</sub> = `r test_stat[["tau"]]`, p (two-tailed) > 0.05.
 
 # Research Question 3:
+What is the relationship between a student’s match in primary care and factors such as rural upbringing, gender, matriculation age, LIC, and ProfID?
 ```{r}
-library(MASS)
-polr_data <- eop3_grades %>%
-  mutate(ProfID = factor(round(ProfID, 0)))
-         
-m <- polr(ProfID ~ Gender, data = polr_data)
+# We have grades for eop 3
+# eop3 is class of 2022 (i.e. they graduated in 2022)
+# Match data from 2022 are joined to eop3_grades
 
+# Create a new data frame with a new variable that indicates whether or not a student matched into a primary care specialty
+eop3_grades_match <- 
+  left_join(eop3_grades,
+          (match %>% filter(MatchYear == 2022)),
+          by = "ResearchID") %>%
+  drop_na(Program_coded) %>%
+  mutate(Primary_Care = ifelse(grepl("Internal Medicine|Pediatrics|Famliy Medicine|OBGYN", Program_coded), 1, 0)) 
+```
+
+## Logistic Regression Model
+```{r}
+# Logistic model predicting Primary_Care (dichotomous), from categorical and continuous variables
+log.model <- glm(Primary_Care ~ Rural + Gender + Matriculation_Age + EvalCC3_1 + LIC + ProfID, family = binomial(), data = eop3_grades_match)
+
+summary(log.model)
+
+# For every one unit increase in ProfID, the log-odds of ending up in primary care increases by 0.72.
+```
+
+## Exponentiated Odds Ratios and Confidence Intervals
+```{r}
+# Odds Ratio
+# For every one unit increase in ProfID, the odds of getting matched into a primary care specialty increase by a factor of 2.05.
+exp(cbind(OR = coef(log.model), confint(log.model)))
+```
+
+
+```{r, Adams 2006 hypothesis, echo=FALSE, eval=FALSE}
+# Models
+boxplot(ProfID ~ Gender, data = eop3_grades)
+eop3_grades %>%
+  t_test(., ProfID ~ Gender)
+
+# Prof ID by URM
+boxplot(ProfID ~ URM, data = eop3_grades[eop3_grades$URM != "Unknown",])
+eop3_grades %>%
+  filter(URM != "Unknown") %>%
+  t_test(., ProfID ~ URM)
+
+# Prof ID by Rural
+boxplot(ProfID ~ Rural, data = eop3_grades[eop3_grades$Rural != "Unknown",])
+eop3_grades %>%
+  filter(Rural != "Unknown") %>%
+  t_test(., ProfID ~ Rural)
+
+# Prof ID by LIC
+boxplot(ProfID ~ LIC, data = eop3_grades)
+eop3_grades %>%
+  t_test(., ProfID ~ LIC)
+
+# Prof ID by Track
+boxplot(ProfID ~ Track, data = eop3_grades)
+anova_test(ProfID ~ Track, data = eop3_grades, type = "III", effect.size = "pes")
+
+```
+
+```{r}
+eop3_grades_match %>%
+  mutate(Primary_Care = as.factor(Primary_Care)) %>%
+  ggplot(., aes(x = ProfID, fill = Primary_Care)) +
+  geom_histogram() +
+  facet_grid(~Primary_Care)
+
+
+boxplot(ProfID ~ Primary_Care, data = eop3_grades_match)
+```
+
+
+```{r, echo=FALSE, eval=FALSE}
+# Seems to me that most questions would revolve around whether or not the LIC is different
+# conceptualize as a 2x2x2 factorial ancova
+Anova(
+  aov(EvalCC3_1 ~ Matriculation_Age + LIC + Gender + LIC*Gender, data = eop3_grades),
+  type = "III")
+
+# Boxplot of Clerkship evals by LIC
+boxplot(EvalCC3_1 ~ LIC, data = eop3_grades)
+
+# Are there differences in professional identification between LIC types after 
+# taking into account rural upbringing, gender, and matriculation age?
+Anova(
+  aov(ProfID ~ Matriculation_Age + LIC + Rural + Gender, data = eop3_grades),
+  type = "III")
+
+# Are there differences in clerkship grades between LIC types after taking into
+# account rural upbringing, gender, and matriculation age?
+Anova(
+  aov(CRSE_GRADE_OFF ~ Matriculation_Age + LIC + Rural + Gender, data = eop3_grades),
+  type = "III")
+
+# Boxplot of Clerkship evals by LIC
+boxplot(CRSE_GRADE_OFF ~ LIC, data = eop3_grades)
+
+```
+
+
+
+```{r, echo=FALSE, eval=FALSE}
+# Polr and multinomial are two different beasts. Multinomial is for when the model has more than two categorical dependent variables, but polr is for when those dependendent variables are ordered. Outcome variable needs to be factor for the Polr model. We can use the multinomial function if the brant test fails in the polr model.
+
+
+library(MASS)
+library(nnet)
+library(broom)
+polr_data <- eop3_grades %>%
+  mutate(ProfID = factor(round(ProfID, 0)),
+         Gender = factor(Gender))
+         
+
+# Relevel the data to set a reference
+polr_data$ProfID <- relevel(polr_data$ProfID, "1")
+
+polr_data$Gender <- relevel(polr_data$Gender, "F")
+
+  
+  # Polr approach
+m <- polr(ProfID ~ Gender, data = polr_data)
 summary(m)
 
 library(brant)
@@ -159,6 +292,21 @@ p = pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
 
 # default method gives profiled CIs
 (ci = confint(m))
+
+# nnet approach
+m <- multinom(ProfID ~ Gender, data = polr_data)
+summary(m)
+tidymodel <- tidy(m)
+tidymodel$expB <- exp(tidymodel$estimate)
+tidymodel
+data.frame(exp(confint(tidymodel)))
+
+
+# Errors out because more than two terms needed
+library(car)
+vif_model <- glm(ProfID ~ Gender, data = polr_data, family = binomial())
+vif(vif_model)
+
 ```
 
 <!-- Possible that the relationship between clerkship grades and professional identity is different between those in the LIC vs those who were not. -->

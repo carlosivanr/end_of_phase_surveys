@@ -54,7 +54,7 @@ process_eop <-  function(eop, eop_codes){
   # Combine/recode Hispanic,Latino, or of Spanish origin to Spanish/Hispanic/Latino/Latina
   # If Not Hispanic or Latino, fill in with whatever is in the race column
   df %<>% 
-    mutate(Ethnicity = recode(Ethnicity, "Hispanic, Latino, or of Spanish origin" = "Spanish/Hispanic/Latino/Latina")) %>%
+    mutate(Ethnicity = dplyr::recode(Ethnicity, "Hispanic, Latino, or of Spanish origin" = "Spanish/Hispanic/Latino/Latina")) %>%
     mutate(Ethnicity = ifelse(Ethnicity == "Not Hispanic or Latino", Race, Ethnicity))
   
   # Rename Ethnicity to Race/Ethncity since it has both types of information

@@ -96,7 +96,12 @@ eop3_grades %<>%
   arrange(TERM_SD) %>%
   slice_tail() %>%
   ungroup()
+
+# Convert the 9 scores which mean not applicable
+eop3_grades %<>%
+  mutate(across(EvalCC3_1:EvalCC3_13, ~ na_if(., 9)))
   
+
 # Process all ProfId columns, by converting to numeric and reverse scoring 
 # questions 3, 4, and 5.
 source(here("functions", "process_ProfId.R"))
@@ -122,7 +127,7 @@ eop3_grades$LIC <- factor(eop3_grades$LIC)
 
 # Recode the Rural and URM variables
 eop3_grades %<>%
-  mutate(across(Rural:URM_AAMC, ~ recode(., `0` = "No", `1` = "Yes", `3` = "Unknown"))) %>%
+  mutate(across(Rural:URM_AAMC, ~ dplyr::recode(., `0` = "No", `1` = "Yes", `3` = "Unknown"))) %>%
   mutate(Rural = ifelse(is.na(Rural), "Unknown", Rural)) %>%
   mutate(across(Rural:URM_AAMC, ~ factor(., levels = c("Yes", "No", "Unknown"))))
   
@@ -131,13 +136,30 @@ eop3_grades %<>%
 eop3_grades %<>%
   mutate(pmap_dfr(across(starts_with("ProfID")),
                   ~ data.frame(ProfID = mean(c(...)))))
+
+
+# Factor the Gender variable
+eop3_grades$Gender <- factor(eop3_grades$Gender)
+
+# Recode LIC
+eop3_grades %<>%
+  mutate(LIC = factor(LIC)) %>%
+  mutate(LIC = dplyr::recode_factor(LIC, `1` = "Yes", `0` = "No"))
+
+
+# Load Match Data --------------------------------------------------------------
+match <- read.xlsx(xlsxFile = here("data", "Match_data_20_21_22.xlsx"))
+
+
+
+
 # Save workspace ---------------------------------------------------------------
 save.image(file = "./data/eop_data.Rdata")
 
 
 
               
-## Test tables --------------------------------------------------
+## Test tables -----------------------------------------------------------------
 # # Test race_ethnicity variables
 # eop4 %>% 
 #   select(Race_1:Race_8) %>%
