@@ -1,0 +1,376 @@
+---
+title: "DFM - End of Phase Surveys"
+format: 
+  html:
+    toc: true
+# format:
+#   docx:
+#     toc: true
+#     number-sections: true
+date: "`r format(Sys.time(), '%B %d %Y')`"
+echo: false
+warning: false
+---
+
+```{r libraries}
+pacman::p_load(here,
+               tidyverse, 
+               gtsummary, 
+               bstfun, 
+               flextable,
+               rstatix,
+               openxlsx,
+               Hmisc,
+               magrittr,
+               DT,
+               car)
+
+options(dplyr.summarise.inform = FALSE) 
+```
+
+```{r load_data, echo=FALSE, include=FALSE}
+#source(str_c(here(), "/scripts/prepare_dataset.R"))
+load(here("data", "eop_data.Rdata"))
+
+rm(eop_code_books, eop_files, eop1, eop2, eop4, q_labels, char_vec)
+
+code_book <- df_codes
+rm(df_codes)
+
+# We have grades for eop 3
+# eop3 is class of 2022 (i.e. they graduated in 2022)
+# Match data from 2022 are joined to eop3_grades
+
+# Create a new data frame with a new variable that indicates whether or not a student matched into a primary care specialty
+eop3_grades_match <- 
+  left_join(eop3_grades,
+          (match %>% filter(MatchYear == 2022)),
+          by = "ResearchID") %>%
+  #drop_na(Program_coded) %>%
+  mutate(FM_Match = ifelse(grepl("Family Medicine", Program_coded), 1, 0)) %>%
+  filter(ResearchID %in% eop3_grades$ResearchID)
+  
+
+
+
+# Rename variables
+data <- 
+  eop3_grades_match %>%
+  rename("CPC_Eval" = EvalCC3_1,
+         "CPC_Grade" = CRSE_GRADE_OFF,
+         "Clerkship" = CRSE_LD,
+         "Match" = Program_coded)
+
+# Make a data frame of those that have a prelim residency
+prelims <- 
+  data %>% 
+  filter(Match == "Prelim Year")
+
+# For those that have a prelim, select the non-preliminary placement
+data <- 
+  bind_rows(
+    (data %>% filter(!ResearchID %in% prelims$ResearchID)),
+    (data %>% filter(ResearchID %in% prelims$ResearchID) %>% group_by(ResearchID) %>% slice_head())
+  )
+
+
+# For those that still have more than one placement, select the first
+data <- 
+  data %>%
+  group_by(ResearchID) %>%
+  slice_head() %>%
+  ungroup()
+
+
+
+data %>%
+  group_by(ResearchID) %>%
+  count() %>%
+  filter(n > 1)
+
+# Get the research IDs that do not have a match
+missing_rids <- data %>% filter(is.na(Match)) %>% select(ResearchID)
+
+# See if the missing research IDs are in the larger Match file
+data %>%
+  filter(ResearchID %in% missing_rids$ResearchID)
+
+#write.csv(missing_rids, file = here("data", "IDs_w_out_a_match.csv"), row.names = FALSE)
+
+# *** Need to figure out what to do with the duplicate match data
+# *** What to do with the folks with NA for match
+# *** We only have 8 FM placements out 155 total.
+```
+
+# Academic year 2020-2021
+# 3rd-years, (Class Of 2022)
+
+# Dataset
+```{r display_data}
+# cpc (community & primary care, )
+data %>%
+  select(CPC_Eval, CPC_Grade, Clerkship, LIC) %>%
+  datatable(.)
+```
+
+# Demographics
+## Matriculation age, gender, rural, and urm
+```{r}
+data %>%
+  select(Matriculation_Age, Gender, Rural, URM, URM_AAMC) %>%
+  tbl_summary()
+```
+
+## Race/Ethnicity
+```{r}
+data %>%
+  select("Race/Ethnicity") %>%
+  tbl_summary(sort = list(everything() ~ "frequency"))
+```
+
+
+## Track, LIC, Course grade
+```{r}
+data %>% 
+  select(Track, LIC, CPC_Grade) %>%
+  tbl_summary(sort = list(everything() ~ "frequency"))
+```
+
+# Data Summary
+```{r display_summary}
+data %>%
+  select(CPC_Eval, CPC_Grade, ProfID, ProfID_1:ProfID_9) %>%
+  summary(.) %>%
+  knitr::kable(.)
+```
+
+
+```{r fig.cap="Poor (1), Fair (2), Good (3), Very Good (4), Excellent (5)"}
+boxplot(eop3_grades$EvalCC3_1,
+        main = "Primary Care Clerkship Evaluations",
+        ylab = "Clerkship Quality Evaluation")
+```
+
+```{r, fig.cap="Grades are Withdraw (1), Pass (2), High Pass (3), Honors(4)"}
+boxplot(eop3_grades$CRSE_GRADE_OFF,
+        main = "Clerkship Grades",
+        ylab = "Clerkship Grade")
+```
+
+```{r, fig.cap="Professional identification responses are Strongly disagree (1), Disagree (2), Neutral (3), Agree (4), Strongly agree (5)"}
+profid <- eop3_grades %>%
+  select(ProfID_1:ProfID) %>%
+  pivot_longer(.,
+               cols = c(ProfID_1:ProfID_9, ProfID),
+               names_to = "Question", 
+               values_to = "Score")
+
+boxplot(Score ~ Question, data = profid,
+        main = "Professional Identification Questionaire")    
+```
+
+
+# Research Question 1: 
+What is the relationship between clerkship evaluations and grades from the family medicine and primary care clerkship?
+```{r}
+eop3_grades %>%
+  filter(EvalCC3_1 != 9) %>%
+  cor_test(
+    EvalCC3_1, 
+    CRSE_GRADE_OFF, 
+    method = "kendall"
+    ) %>%
+  knitr::kable(.)
+
+# Save the test statistic to a variable for reporting output
+test_stat <- 
+  eop3_grades %>%
+  filter(EvalCC3_1 != 9) %>%
+  cor_test(
+    EvalCC3_1, 
+    CRSE_GRADE_OFF, 
+    method = "kendall"
+    ) %>%
+  pull(cor) 
+```
+
+There was a significant positive relationship between a student's clerkship evaluation and their grades from the family medicine and primary care clerkship, r<sub>$\tau$</sub> = `r test_stat[["tau"]]`, p (two-tailed) < 0.05.
+
+# Research Question 2: 
+What is the relationship between family medicine and primary care clerkship grades and professional identity in 3rd year medical students?
+```{r}
+eop3_grades %>%
+  filter(EvalCC3_1 != 9) %>%
+  cor_test(
+    CRSE_GRADE_OFF, 
+    ProfID, 
+    method = "kendall"
+    ) %>%
+  knitr::kable(.)
+
+# Save the test statistic to a variable for reporting output
+test_stat <- 
+  eop3_grades %>%
+  filter(EvalCC3_1 != 9) %>%
+  cor_test( 
+    CRSE_GRADE_OFF,
+    ProfID,
+    method = "kendall"
+    ) %>%
+  pull(cor) 
+```
+
+Family medicine and primary care clerkship grades were not significantly related to a mean of professional identity scores, r<sub>$\tau$</sub> = `r test_stat[["tau"]]`, p (two-tailed) > 0.05.
+
+# Research Question 3:
+What is the relationship between a student’s match in primary care and factors such as rural upbringing, gender, matriculation age, LIC, and ProfID? Analyses exclude individuals who did not have data for the variable of interest.
+```{r}
+# Dependent variable is whether or not they matched in FM or not
+# Independent variables are :
+  # Gender
+  # Age
+  # URM
+  # LIC
+  # Rural
+  # CPC Grades
+  # CPC Evals
+  # Professional ID composite
+```
+
+
+## Match and Gender
+```{r}
+# What is the bivariate relationship between Match and Gender?
+data %>%
+  mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+  select(Match, Gender) %>%
+  tbl_summary(by = Match
+              ) %>%
+  add_p(everything()~"chisq.test")
+
+
+# Chi square test, all match categories
+#chisq.test(table(data$Match, data$Gender))
+
+# Chi square test, binary FM match category
+# chisq.test(table(data %>%
+#   mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+#   select(Match, Gender) %>% pull(Match), data$Gender))
+```
+
+
+## Match and Matriculation Age
+```{r}
+# What is the bivariate relationship between Match and Age?
+data %>%
+  mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM"),
+         Age = as.numeric(Matriculation_Age)) %>%
+  select(Match, Age) %>%
+  tbl_summary(by = Match
+              ) %>%
+  add_p(everything() ~ "t.test")
+```
+
+
+## Match and URM
+### URM
+```{r}
+data %>%
+  mutate(URM = factor(as.character(na_if(URM, "Unknown"))),
+         Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+  drop_na(URM) %>%
+  select(Match, URM) %>%
+  tbl_summary(by = Match
+              ) %>%
+  add_p(everything()~"chisq.test")
+```
+
+### URM_AAMC
+```{r}
+data %>%
+  mutate(URM_AAMC = factor(as.character(na_if(URM_AAMC, "Unknown"))),
+         Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+  drop_na(URM_AAMC) %>%
+  select(Match, URM_AAMC) %>%
+  tbl_summary(by = Match,
+              missing = "no",
+              ) %>%
+  add_p(everything()~"chisq.test")
+```
+
+
+## Match and LIC
+```{r}
+# LIC
+data %>%
+  mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+  select(Match, LIC) %>%
+  tbl_summary(by = Match,
+              missing = "no",
+              ) %>%
+  add_p(everything()~"chisq.test")
+```
+
+## Match and Rural
+```{r}
+# Rural
+data %>%
+  mutate(Rural = factor(as.character(na_if(Rural, "Unknown"))),
+         Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+  select(Match, Rural) %>%
+  tbl_summary(by = Match,
+              missing = "no",
+              ) %>%
+  add_p(everything()~"chisq.test")
+```
+
+## Match and Community & Primary Care Clerkship Grades
+```{r}
+# CPC Grades
+data %>%
+  mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+  select(Match, CPC_Grade) %>%
+  tbl_summary(by = Match,
+              missing = "no",
+              ) %>%
+  add_p(everything()~"chisq.test")
+
+```
+
+## Match and Community & Primary Care Clerkship Evals
+```{r}
+# CPC Evals
+data %>%
+  mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+  select(Match, CPC_Eval) %>%
+  tbl_summary(by = Match,
+              missing = "no",
+              type = list(CPC_Eval ~ "continuous", Match ~ "categorical")) %>%
+  add_p(everything()~"t.test")
+
+```
+
+
+## Match and Professional Identification Composite
+```{r}
+# # Professional ID composite
+# data %>%
+#   mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+#   select(Match, ProfID) %>%
+#   tbl_summary(by = Match,
+#               missing = "no",
+#               ) %>%
+#   add_p(everything()~"chisq.test")
+
+
+
+# ProfID as a continuous variable
+data %>%
+  mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM")) %>%
+  select(Match, ProfID) %>%
+  tbl_summary(by = Match,
+              missing = "no",
+              type = list(ProfID ~ "continuous", Match ~ "categorical")) %>%
+  add_p(everything()~"t.test")
+
+```
