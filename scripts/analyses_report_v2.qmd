@@ -32,8 +32,10 @@ options(dplyr.summarise.inform = FALSE)
 #source(str_c(here(), "/scripts/prepare_dataset.R"))
 load(here("data", "eop_data.Rdata"))
 
+# Remove un-necessary data frames
 rm(eop_code_books, eop_files, eop1, eop2, eop4, q_labels, char_vec)
 
+# Rename df codes to code_book and remove df_codes
 code_book <- df_codes
 rm(df_codes)
 
@@ -49,8 +51,6 @@ eop3_grades_match <-
   #drop_na(Program_coded) %>%
   mutate(FM_Match = ifelse(grepl("Family Medicine", Program_coded), 1, 0)) %>%
   filter(ResearchID %in% eop3_grades$ResearchID)
-  
-
 
 
 # Rename variables
@@ -81,25 +81,26 @@ data <-
   slice_head() %>%
   ungroup()
 
-
-
+# Check to count that data does not contain more than one placement
 data %>%
   group_by(ResearchID) %>%
   count() %>%
-  filter(n > 1)
+  filter(n > 1) %>%
+  nrow()
 
 # Get the research IDs that do not have a match
-missing_rids <- data %>% filter(is.na(Match)) %>% select(ResearchID)
+missing_rids <- data %>% 
+  filter(is.na(Match)) %>% 
+  select(ResearchID)
 
 # See if the missing research IDs are in the larger Match file
 data %>%
   filter(ResearchID %in% missing_rids$ResearchID)
 
 #write.csv(missing_rids, file = here("data", "IDs_w_out_a_match.csv"), row.names = FALSE)
-
-# *** Need to figure out what to do with the duplicate match data
-# *** What to do with the folks with NA for match
-# *** We only have 8 FM placements out 155 total.
+# Per Wendy Christense at Office of assessment evaluation and outcomes: we do not have match 
+# information for the missing research IDs. Almost all missing research IDs either graduated 
+# in September 2022, instead of Spring 2022, or pushed back graduation to Spring 2023.
 ```
 
 # Academic year 2020-2021
@@ -224,18 +225,6 @@ Family medicine and primary care clerkship grades were not significantly related
 
 # Research Question 3:
 What is the relationship between a student’s match in primary care and factors such as rural upbringing, gender, matriculation age, LIC, and ProfID? Analyses exclude individuals who did not have data for the variable of interest.
-```{r}
-# Dependent variable is whether or not they matched in FM or not
-# Independent variables are :
-  # Gender
-  # Age
-  # URM
-  # LIC
-  # Rural
-  # CPC Grades
-  # CPC Evals
-  # Professional ID composite
-```
 
 
 ## Match and Gender
@@ -266,8 +255,8 @@ data %>%
   mutate(Match = ifelse(Match == "Family Medicine", "FM", "Non-FM"),
          Age = as.numeric(Matriculation_Age)) %>%
   select(Match, Age) %>%
-  tbl_summary(by = Match
-              ) %>%
+  tbl_summary(by = Match,
+              statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
   add_p(everything() ~ "t.test")
 ```
 
@@ -332,8 +321,10 @@ data %>%
   select(Match, CPC_Grade) %>%
   tbl_summary(by = Match,
               missing = "no",
-              ) %>%
-  add_p(everything()~"chisq.test")
+              type = list(CPC_Grade ~ "continuous", Match ~ "categorical"),
+              statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
+  #add_p(everything()~"chisq.test")
+  add_p(everything()~"t.test")
 
 ```
 
@@ -345,7 +336,8 @@ data %>%
   select(Match, CPC_Eval) %>%
   tbl_summary(by = Match,
               missing = "no",
-              type = list(CPC_Eval ~ "continuous", Match ~ "categorical")) %>%
+              type = list(CPC_Eval ~ "continuous", Match ~ "categorical"),
+              statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
   add_p(everything()~"t.test")
 
 ```
@@ -370,7 +362,8 @@ data %>%
   select(Match, ProfID) %>%
   tbl_summary(by = Match,
               missing = "no",
-              type = list(ProfID ~ "continuous", Match ~ "categorical")) %>%
+              type = list(ProfID ~ "continuous", Match ~ "categorical"),
+              statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
   add_p(everything()~"t.test")
 
 ```
